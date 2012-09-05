@@ -1,0 +1,10 @@
+name: MinecraftTestPlugin
+main: com.gmail.ddmytriw.MinecraftTestPlugin.MinecraftTestPlugin
+version: 0.1
+
+commands:
+   testplugin:
+      description: This is a testplugin command.
+      usage: /testplugin
+      permission: MinecraftTestPlugin.testplugin
+      permission-message: You don't have <permission>
