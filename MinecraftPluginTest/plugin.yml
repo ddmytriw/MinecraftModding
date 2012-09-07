@@ -1,6 +1,7 @@
 name: MinecraftTestPlugin
 main: com.gmail.ddmytriw.MinecraftTestPlugin.MinecraftTestPlugin
 version: 0.1
+load: STARTUP
 
 commands:
    testplugin:

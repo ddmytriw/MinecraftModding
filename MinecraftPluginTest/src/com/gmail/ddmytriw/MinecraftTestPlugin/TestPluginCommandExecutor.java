@@ -21,6 +21,14 @@ public class TestPluginCommandExecutor implements CommandExecutor {
 	
 		if (command.getName().equalsIgnoreCase("testplugin")){ // If the player typed /basic then do the following...
 			plugin.getLogger().info(plugin.getName() + " command: testplugin");
+			for(int i = 0; i < arg3.length; i++){
+				plugin.getLogger().info(plugin.getName() + " 	args: " + arg3[i]);
+			}
+			
+			if(arg3.length > 1){
+				plugin.PrintBlockList();
+			}
+			
 			return true;
 		} else if (command.getName().equalsIgnoreCase("testplugin2")) {
 			if (player == null) {
