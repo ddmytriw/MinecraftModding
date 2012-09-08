@@ -1,4 +1,4 @@
-<project name="Example Build Script" basedir="." default="deploy.local">
+<project name="Minecraft Plugin Build Script" basedir="." default="deploy.local">
 	<!-- Load properties -->
 	<property file="build.properties"/>
 	
