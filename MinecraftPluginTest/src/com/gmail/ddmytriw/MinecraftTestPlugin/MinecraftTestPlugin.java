@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.bukkit.Chunk;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,8 +12,6 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.world.ChunkPopulateEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -137,40 +134,40 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 		this.onBlockChange(block_list);
 	}
 	
-	/*@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(BlockDamageEvent event){
-        if (event.isCancelled()) return;
-        
-		getLogger().info(event.getEventName());
-	}
-		
-	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(BlockFadeEvent event){
-        if (event.isCancelled()) return;
-        
-		getLogger().info(event.getEventName());
-
-		modified_block_list.add(event.getBlock());
-	}
-		
-	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(EntityChangeBlockEvent event){
-        if (event.isCancelled()) return;
-        
-		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
-
-		this.onBlockChange(event.getBlock());
-	}
-	
-	/*@EventHandler(priority = EventPriority.LOW)
-	public void onChunkLoaded(ChunkLoadEvent event){
-		if(event.isNewChunk()){
-			getLogger().info(event.getEventName() + " loc:" + event.getChunk().getX() + "," + event.getChunk().getZ() + " - new chunk!");
-		}
-	}
-	
-	@EventHandler(priority = EventPriority.LOW)
-	public void onChunkLoaded(ChunkPopulateEvent event){
-		getLogger().info(event.getEventName() + ": loc:" + event.getChunk().getX() + "," + event.getChunk().getZ());
-	}*/
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(BlockDamageEvent event){
+//        if (event.isCancelled()) return;
+//        
+//		getLogger().info(event.getEventName());
+//	}
+//		
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(BlockFadeEvent event){
+//        if (event.isCancelled()) return;
+//        
+//		getLogger().info(event.getEventName());
+//		event.getNewState().
+//		modified_block_list.add(event.getBlock());
+//	}
+//		
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(EntityChangeBlockEvent event){
+//        if (event.isCancelled()) return;
+//        
+//		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
+//
+//		this.onBlockChange(event.getBlock());
+//	}
+//	
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onChunkLoaded(ChunkLoadEvent event){
+//		if(event.isNewChunk()){
+//			getLogger().info(event.getEventName() + " loc:" + event.getChunk().getX() + "," + event.getChunk().getZ() + " - new chunk!");
+//		}
+//	}
+//	
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onChunkLoaded(ChunkPopulateEvent event){
+//		getLogger().info(event.getEventName() + ": loc:" + event.getChunk().getX() + "," + event.getChunk().getZ());
+//	}
 }

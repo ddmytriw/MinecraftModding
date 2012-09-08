@@ -1,0 +1,51 @@
+<project name="Example Build Script" basedir="." default="deploy.local">
+	<!-- Load properties -->
+	<property file="build.properties"/>
+	
+	<!-- Set variables for build directories -->
+	<property name="build.dir" value="build"/>
+	<property name="src.dir" value="src"/>
+	<property name="pluginname.jar" value="MinecraftTestPlugin.jar"/>
+	<property name="plugintarget" value="${deploy.dir.local}/${pluginname.jar}"/>
+	
+	
+	<target name="clean" description="Clean up">
+		<echo>Cleaning up...</echo>
+		<delete dir="${build.dir}"/>
+	</target>
+		
+	<target name="deploy.local" description="Deploy to local server">
+		<echo>Creating temporary folders...</echo>
+		<mkdir dir="${build.dir}"/>
+		
+		<echo>Compiling...</echo>
+		<javac destdir="${build.dir}"
+				debug="on"
+				optimize="on">
+			<src path="${src.dir}"/>
+		</javac>
+
+		<echo>Copying extra files to build folder...</echo>
+		<copy todir="${build.dir}">
+			<fileset file="plugin.yml"/>
+			<fileset file=".classpath"/>
+			<fileset file=".project"/>
+		</copy>
+		
+		<echo>Deleting files from local Minecraft server...</echo>
+		<delete>
+			<fileset file="${plugintarget}"/>
+		</delete>
+		
+		<echo>Constructing plugin jar...</echo>
+		<jar jarfile="${plugintarget}" basedir="${build.dir}"/>
+		
+		<echo>Copying files to local Minecraft server...</echo>
+		<copy todir="${deploy.dir.local}">
+			<fileset file="${build.dir}/${pluginname.jar}"/>
+		</copy>
+		
+		<antcall target="clean"/>
+	</target>
+	
+</project>

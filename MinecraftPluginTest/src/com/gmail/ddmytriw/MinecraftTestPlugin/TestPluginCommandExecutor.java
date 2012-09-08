@@ -25,9 +25,7 @@ public class TestPluginCommandExecutor implements CommandExecutor {
 				plugin.getLogger().info(plugin.getName() + " 	args: " + arg3[i]);
 			}
 			
-			if(arg3.length > 1){
-				plugin.PrintBlockList();
-			}
+			plugin.PrintBlockList();
 			
 			return true;
 		} else if (command.getName().equalsIgnoreCase("testplugin2")) {
