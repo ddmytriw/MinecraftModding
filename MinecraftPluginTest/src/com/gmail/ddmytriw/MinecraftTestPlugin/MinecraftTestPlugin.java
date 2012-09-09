@@ -1,9 +1,12 @@
 package com.gmail.ddmytriw.MinecraftTestPlugin;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -11,6 +14,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
@@ -43,9 +47,10 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 			@Override
 			public void run() {
 				//getLogger().info("scheduleSyncRepeatingTask.run()");
-				
+
 				if(!modified_block_list.isEmpty())
 				{
+					SortBlockList();
 					Block block = modified_block_list.remove(0);
 					RegenBlock(block);
 				}
@@ -60,7 +65,7 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 			}
 		}, 0L, 20L*10L);*/
 	}
-	
+
 	public void PrintBlockList()
 	{
 		getLogger().info(this.getName() + ".PrintBlockList()");
@@ -71,15 +76,49 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 			getLogger().info(iter.hashCode() + ": x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
 		}
 	}
+	
+	public class blockSortingComparator implements Comparator<Block>{
+		@Override
+	    public int compare(Block block1, Block block2) {
+	        return block1.getY() - block2.getY();
+	    }
+	}
+	
+	public void SortBlockList()
+	{		
+		//sort by Y, this will move lowest blocks in terrain to front of regen 'queue'
+		Collections.sort(modified_block_list, new blockSortingComparator());
+	}
 
 	static String BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID = "original_type_id";
-	private void SetBlockMetadata(Block block)
+	static String BLOCK_METADATA_KEY_PLACED_BY_PLAYER = "placed_by_player";
+	private void SetBlockRegenMetadata(Block block)
 	{
 		//check that block is original(from the original world generation and not placed by a player or entity)
 		if(!block.hasMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID)){
 			block.setMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID, new FixedMetadataValue(this, block.getTypeId()));
 		}
 	}
+
+	private void SetBlockPlayerPlacedMetadata(Block block)
+	{
+		//check that block is original(from the original world generation and not placed by a player or entity)
+		if(!block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER)){
+			block.setMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER, new FixedMetadataValue(this, true));
+		}
+	}
+	
+	private boolean IsBlockPlayerPlaced(Block block)
+	{
+		return block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER);
+	}	
+	
+	private void ResetBlockPlayerPlacedMetadata(Block block)
+	{
+		if(!block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER)){
+			block.removeMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER, this);
+		}
+	}	
 	
 	private void RegenBlock(Block block)
 	{
@@ -94,23 +133,39 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 				block.removeMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID, this);
 				return;
 			}
+		}		
+	}
+	
+	public void onBlockRemoved(Block block){
+		if(IsBlockPlayerPlaced(block)){
+			ResetBlockPlayerPlacedMetadata(block);
 		}
-		
+		else
+		{
+			SetBlockRegenMetadata(block);
+			//TODO: check that block is 'regeneratable' (ie, not plant life)		
+			modified_block_list.add(block);	
+		}
 	}
 	
-	public void onBlockChange(Block block){
-		SetBlockMetadata(block);
-		//TODO: check that block is 'regeneratable' (ie, not plant life)		
-		modified_block_list.add(block);
-	}
-	
-	public void onBlockChange(List<Block> block_list){
+	public void onBlockRemoved(List<Block> block_list){
 		ListIterator<Block> iter = block_list.listIterator();
 		while (iter.hasNext()) {
 			Block block = (Block) iter.next();
-			onBlockChange(block);
+			onBlockRemoved(block);
 		}
 		
+	}
+	
+	@EventHandler(priority = EventPriority.LOW)
+	public void onBlockChange(BlockPlaceEvent event){
+        if (event.isCancelled()) return;
+        
+		Player player = event.getPlayer();
+		Block block = event.getBlockPlaced();
+		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " placed a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
+		
+		SetBlockPlayerPlacedMetadata(block);
 	}
 	
 	@EventHandler(priority = EventPriority.LOW)
@@ -121,7 +176,7 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 		Block block = event.getBlock();
 		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " broke a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
 		
-		this.onBlockChange(event.getBlock());
+		this.onBlockRemoved(event.getBlock());
 	}
 
 	@EventHandler(priority = EventPriority.LOW)
@@ -131,7 +186,7 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
 
 		List<Block> block_list = event.blockList();
-		this.onBlockChange(block_list);
+		this.onBlockRemoved(block_list);
 	}
 	
 //	@EventHandler(priority = EventPriority.LOW)
@@ -147,7 +202,6 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 //        
 //		getLogger().info(event.getEventName());
 //		event.getNewState().
-//		modified_block_list.add(event.getBlock());
 //	}
 //		
 //	@EventHandler(priority = EventPriority.LOW)
@@ -155,8 +209,6 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 //        if (event.isCancelled()) return;
 //        
 //		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
-//
-//		this.onBlockChange(event.getBlock());
 //	}
 //	
 //	@EventHandler(priority = EventPriority.LOW)
