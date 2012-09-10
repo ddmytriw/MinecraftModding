@@ -1,11 +1,11 @@
-<project name="Minecraft Plugin Build Script" basedir="." default="deploy.local">
+<project name="Regen Plugin Build Script" basedir="." default="deploy.local">
 	<!-- Load properties -->
 	<property file="build.properties"/>
 	
 	<!-- Set variables for build directories -->
 	<property name="build.dir" value="build"/>
 	<property name="src.dir" value="src"/>
-	<property name="pluginname.jar" value="MinecraftTestPlugin.jar"/>
+	<property name="pluginname.jar" value="RegenPlugin.jar"/>
 	<property name="plugintarget" value="${deploy.dir.local}/${pluginname.jar}"/>
 	
 	

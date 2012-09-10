@@ -1,4 +1,4 @@
-package com.gmail.ddmytriw.MinecraftTestPlugin;
+package com.gmail.ddmytriw.RegenPlugin;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,10 +19,11 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class MinecraftTestPlugin extends JavaPlugin implements Listener {
-	
-	private List<Block> modified_block_list = new ArrayList<Block>();
+public class RegenPlugin extends JavaPlugin implements Listener {
 
+	private int regenTaskId = -1;
+	private List<Block> modified_block_list = new ArrayList<Block>();
+	
 	@Override
 	public void onDisable() {
 		super.onDisable();
@@ -38,123 +38,139 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 		getLogger().info(this.getName() + "onEnable has been invoked!");
 		
 		// This will throw a NullPointException if you don't have the command defined in your plugin.yml file!
-		getCommand("testplugin").setExecutor(new TestPluginCommandExecutor(this));
+		getCommand("regen").setExecutor(new PluginCommandExecutor(this));
 		
 		this.getServer().getPluginManager().registerEvents(this, this);
 		
-		// debug stuff
-		this.getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable(){
-			@Override
-			public void run() {
-				//getLogger().info("scheduleSyncRepeatingTask.run()");
+		StartRegen();
+	}
+	
+	public void RegenTask()
+	{
+		//getLogger().info(this.getName() + ".RegenTask()");
 
-				if(!modified_block_list.isEmpty())
-				{
-					SortBlockList();
-					Block block = modified_block_list.remove(0);
-					RegenBlock(block);
-				}
-				
-			}
-		}, 0L, 20L);
-		
-		/*this.getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable(){
-			@Override
-			public void run() {
-				getLogger().info("scheduleAsyncRepeatingTask.run()");
-			}
-		}, 0L, 20L*10L);*/
+		if(!modified_block_list.isEmpty())
+		{
+			//sort by Y, this will move lowest blocks in terrain to front of regen 'queue'
+			Collections.sort(modified_block_list, new blockSortingComparator());
+			
+			Block block = modified_block_list.remove(0);
+			regenBlock(block);
+		}
 	}
 
-	public void PrintBlockList()
+	public void StartRegen()
 	{
-		getLogger().info(this.getName() + ".PrintBlockList()");
-		
-		ListIterator<Block> iter = modified_block_list.listIterator();
-		while (iter.hasNext()) {
-			Block block = (Block) iter.next();
-			getLogger().info(iter.hashCode() + ": x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
+		if(regenTaskId == -1)
+		{
+			getLogger().info(this.getName() + " Regen task activated!");
+			
+			Runnable regen_task = new Runnable(){
+				@Override
+				public void run() {
+					RegenTask();
+				}
+			};
+			
+			regenTaskId = this.getServer().getScheduler().scheduleSyncRepeatingTask(this, regen_task, 0L, 20L);
+		}
+		else
+		{
+			getLogger().info(this.getName() + " Error: Regen task already active. Use '/regen stop' to stop task.");
 		}
 	}
 	
+	public void StopRegen()
+	{
+		if(regenTaskId != -1)
+		{
+			getLogger().info(this.getName() + " Regen task stopped!");
+			this.getServer().getScheduler().cancelTask(regenTaskId);
+		}
+		else
+		{
+			getLogger().info(this.getName() + " Error: Regen task wasn't running!");
+		}
+	}
+	
+	public void SaveBlockList()
+	{
+		getLogger().info(this.getName() + ".SaveBlockList()");
+		
+	}
+	
+	public void LoadBlockList()
+	{
+		getLogger().info(this.getName() + ".LoadBlockList()");
+
+	}
+
 	public class blockSortingComparator implements Comparator<Block>{
 		@Override
 	    public int compare(Block block1, Block block2) {
 	        return block1.getY() - block2.getY();
 	    }
 	}
-	
-	public void SortBlockList()
-	{		
-		//sort by Y, this will move lowest blocks in terrain to front of regen 'queue'
-		Collections.sort(modified_block_list, new blockSortingComparator());
-	}
 
-	static String BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID = "original_type_id";
-	static String BLOCK_METADATA_KEY_PLACED_BY_PLAYER = "placed_by_player";
-	private void SetBlockRegenMetadata(Block block)
+	static String KEY_ORIGINAL_TYPE_ID = "original_type_id";
+	static String KEY_PLACED_BY_PLAYER = "placed_by_player";	
+	private void setBlockPlacedByPlayer(Block block)
 	{
 		//check that block is original(from the original world generation and not placed by a player or entity)
-		if(!block.hasMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID)){
-			block.setMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID, new FixedMetadataValue(this, block.getTypeId()));
+		if(!block.hasMetadata(KEY_PLACED_BY_PLAYER)){
+			block.setMetadata(KEY_PLACED_BY_PLAYER, new FixedMetadataValue(this, true));
+		}
+	}
+	
+	private boolean isBlockPlacedByPlayer(Block block)
+	{
+		return block.hasMetadata(KEY_PLACED_BY_PLAYER);
+	}
+	
+	private void clearBlockPlacedByPlayerMetadata(Block block)
+	{
+		if(!block.hasMetadata(KEY_PLACED_BY_PLAYER)){
+			block.removeMetadata(KEY_PLACED_BY_PLAYER, this);
 		}
 	}
 
-	private void SetBlockPlayerPlacedMetadata(Block block)
-	{
-		//check that block is original(from the original world generation and not placed by a player or entity)
-		if(!block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER)){
-			block.setMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER, new FixedMetadataValue(this, true));
-		}
-	}
-	
-	private boolean IsBlockPlayerPlaced(Block block)
-	{
-		return block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER);
-	}	
-	
-	private void ResetBlockPlayerPlacedMetadata(Block block)
-	{
-		if(!block.hasMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER)){
-			block.removeMetadata(BLOCK_METADATA_KEY_PLACED_BY_PLAYER, this);
-		}
-	}	
-	
-	private void RegenBlock(Block block)
-	{
-		assert(block.hasMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID));
-		
-		List<MetadataValue> values = block.getMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID);
-		for(MetadataValue value : values){
-			if(value.getOwningPlugin().getDescription().getName().equals(this.getDescription().getName())){ //do we need to do this check? seems inefficient
-				int block_type = value.asInt();
-				getLogger().info("changing block at " + block.getLocation().toString() + " from:" + block.getTypeId() + " to:" + block_type);
-				block.setTypeId(block_type);				
-				block.removeMetadata(BLOCK_METADATA_KEY_ORIGINAL_TYPE_ID, this);
-				return;
-			}
-		}		
-	}
-	
 	public void onBlockRemoved(Block block){
-		if(IsBlockPlayerPlaced(block)){
-			ResetBlockPlayerPlacedMetadata(block);
+		//check that block is original(from the original world generation and not placed by a player or entity)
+		if(isBlockPlacedByPlayer(block)){
+			clearBlockPlacedByPlayerMetadata(block);
 		}
 		else
 		{
-			SetBlockRegenMetadata(block);
+			if(!block.hasMetadata(KEY_ORIGINAL_TYPE_ID)){
+				block.setMetadata(KEY_ORIGINAL_TYPE_ID, new FixedMetadataValue(this, block.getTypeId()));
+			}
 			//TODO: check that block is 'regeneratable' (ie, not plant life)		
 			modified_block_list.add(block);	
 		}
 	}
+	
+	private void regenBlock(Block block)
+	{
+		assert(block.hasMetadata(KEY_ORIGINAL_TYPE_ID));
+		
+		List<MetadataValue> values = block.getMetadata(KEY_ORIGINAL_TYPE_ID);
+		for(MetadataValue value : values){
+			if(value.getOwningPlugin().getDescription().getName().equals(this.getDescription().getName())){ //do we need to do this check? seems inefficient
+				int block_type = value.asInt();
+				//getLogger().info("changing block at " + block.getLocation().toString() + " from:" + block.getTypeId() + " to:" + block_type);
+				block.setTypeId(block_type);				
+				block.removeMetadata(KEY_ORIGINAL_TYPE_ID, this);
+				return;
+			}
+		}		
+	}	
 	
 	public void onBlockRemoved(List<Block> block_list){
 		ListIterator<Block> iter = block_list.listIterator();
 		while (iter.hasNext()) {
 			Block block = (Block) iter.next();
 			onBlockRemoved(block);
-		}
-		
+		}		
 	}
 	
 	@EventHandler(priority = EventPriority.LOW)
@@ -165,18 +181,26 @@ public class MinecraftTestPlugin extends JavaPlugin implements Listener {
 		Block block = event.getBlockPlaced();
 		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " placed a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
 		
-		SetBlockPlayerPlacedMetadata(block);
+		setBlockPlacedByPlayer(block);
 	}
 	
 	@EventHandler(priority = EventPriority.LOW)
 	public void onBlockChange(BlockBreakEvent event){
         if (event.isCancelled()) return;
         
-		Player player = event.getPlayer();
 		Block block = event.getBlock();
-		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " broke a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
+		getLogger().info(event.getEventName() + ": "
+		+ event.getPlayer().getDisplayName()
+		+ " broke a block id: "
+		+ block.getTypeId()
+		+ " at x:" + block.getX()
+		+ " y:" + block.getY()
+		+ " z:" + block.getZ()
+		+ " with:" + event.getPlayer().getItemInHand().toString());
 		
-		this.onBlockRemoved(event.getBlock());
+		this.onBlockRemoved(block);
+		
+		block.breakNaturally(event.getPlayer().getItemInHand());
 	}
 
 	@EventHandler(priority = EventPriority.LOW)

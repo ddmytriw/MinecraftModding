@@ -1,11 +1,11 @@
-name: MinecraftTestPlugin
-main: com.gmail.ddmytriw.MinecraftTestPlugin.MinecraftTestPlugin
+name: RegenPlugin
+main: com.gmail.ddmytriw.RegenPlugin.RegenPlugin
 version: 0.1
 load: STARTUP
 
 commands:
-   testplugin:
-      description: This is a testplugin command.
-      usage: /testplugin
+   regen:
+      description: Regen mod start or stop.
+      usage: /regen <start/stop>
       permission: MinecraftTestPlugin.testplugin
       permission-message: You don't have <permission>
