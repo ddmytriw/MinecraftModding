@@ -25,7 +25,14 @@ public class PluginCommandExecutor implements CommandExecutor {
 			{
 				if(arg3[0].equalsIgnoreCase("start"))
 				{
-					plugin.StartRegen();
+					if(arg3.length > 1)
+					{
+						plugin.StartRegen(Long.valueOf(arg3[1]));
+					}
+					else
+					{
+						plugin.StartRegen(plugin.DEFAULT_TASK_PERIOD);						
+					}
 				}
 				else if(arg3[0].equalsIgnoreCase("stop"))
 				{
