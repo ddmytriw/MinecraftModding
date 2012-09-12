@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class RegenPlugin extends JavaPlugin implements Listener {
@@ -116,6 +117,8 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 			getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
 			regenerator.onBlockRemoved(block_list);
 		}
+
+		event.setYield(0); //TODO: remove this!
 	}
 	
 //	@EventHandler(priority = EventPriority.LOW)
@@ -151,4 +154,10 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 //	public void onChunkLoaded(ChunkPopulateEvent event){
 //		getLogger().info(event.getEventName() + ": loc:" + event.getChunk().getX() + "," + event.getChunk().getZ());
 //	}
+	
+	@EventHandler(priority = EventPriority.LOW)
+	public void onChunkLoaded(ExplosionPrimeEvent event){
+		getLogger().info(event.getEventName());
+		event.setRadius(25 * event.getRadius());
+	}
 }

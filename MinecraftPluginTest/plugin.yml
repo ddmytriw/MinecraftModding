@@ -1,7 +1,6 @@
 name: RegenPlugin
 main: com.gmail.ddmytriw.RegenPlugin.RegenPlugin
 version: 0.1
-load: STARTUP
 
 commands:
    regen:
