@@ -5,9 +5,20 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.logging.Logger;
 
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.Plugin;
@@ -22,18 +33,23 @@ import javax.xml.transform.*;
 import javax.xml.transform.dom.*;
 import javax.xml.transform.stream.*;
 
-public class Regenerator implements Runnable {
-	static String KEY_ORIGINAL_TYPE_ID = "original_type_id";
+public class Regenerator implements Runnable, Listener {
 	private Plugin plugin;
+	
 	private List<Block> regenBlockList = new ArrayList<Block>();
 	private List<Block> playerPlacedBlockList = new ArrayList<Block>();
+	
+	private String worldName;
+	static String WORLD_NAME_ARCHETYPE_WORLD = "archetype_world";
+	private World archetype_world;
 
 	static String BLOCK_LIST_FILE_FOLDER = System.getProperty("user.dir") + "\\plugins\\";
 	static String BLOCK_LIST_FILE = BLOCK_LIST_FILE_FOLDER + "blockLists.xml";
 	
-	public Regenerator(Plugin plugin) {
+	public Regenerator(Plugin plugin, String world_name) {
 		super();
 		this.plugin = plugin;
+		worldName = world_name;
 	}
 
 	@Override
@@ -44,13 +60,34 @@ public class Regenerator implements Runnable {
 	public void onEnable()
 	{
 		plugin.getLogger().info("Regenerator.onEnable()");
+		
+		plugin.getServer().getPluginManager().registerEvents((Listener) this, plugin);
+
+		World world = plugin.getServer().getWorld(worldName);
+		assert(world != null);		
+		archetype_world = plugin.getServer().getWorld(WORLD_NAME_ARCHETYPE_WORLD);
+		if(null == archetype_world)
+		{
+			plugin.getLogger().info("creating new World: 'archetype_world'.");
+			WorldCreator wc = new WorldCreator(WORLD_NAME_ARCHETYPE_WORLD);
+			wc.copy(world);
+			archetype_world = wc.createWorld();
+		}
+		
+		archetype_world.setSpawnFlags(false, false);
+		archetype_world.setAutoSave(false);
+		archetype_world.setKeepSpawnInMemory(false);
+		plugin.getLogger().info("archetype_world ready!");
+		
 		loadBlockList();
 	}
-	
+
 	public void onDisable() 
 	{
 		plugin.getLogger().info("Regenerator.onDisable()");
 		saveBlockList();
+		
+		HandlerList.unregisterAll((Listener)this);
 	}
 
 	public void regenTask()
@@ -107,9 +144,6 @@ public class Regenerator implements Runnable {
 	        block_element.setAttribute("x", String.valueOf(block.getX()));
 	        block_element.setAttribute("y", String.valueOf(block.getY()));
 	        block_element.setAttribute("z", String.valueOf(block.getZ()));
-	        block_element.setAttribute("world_name", String.valueOf(block.getWorld().getName())); //TODO: Seperate Regenerator per world/chunk?
-	        int block_type_id = getOriginalBlockTypeId(block);
-	        block_element.setAttribute("typeId", String.valueOf(block_type_id));
 	        root.appendChild(block_element);			
 		}
 
@@ -210,13 +244,10 @@ public class Regenerator implements Runnable {
 				{
 					//a child element to process
 					Element block_element = (Element) node;
-					World world = plugin.getServer().getWorld(block_element.getAttribute("world_name"));
+					World world = plugin.getServer().getWorld(worldName);
 					Block block = world.getBlockAt(Integer.parseInt(block_element.getAttribute("x"))
 													,Integer.parseInt(block_element.getAttribute("y"))
 													,Integer.parseInt(block_element.getAttribute("z")));
-
-					assert(!block.hasMetadata(KEY_ORIGINAL_TYPE_ID));
-					block.setMetadata(KEY_ORIGINAL_TYPE_ID, new FixedMetadataValue(plugin, Integer.parseInt(block_element.getAttribute("typeId"))));
 					
 				    this.addBlockToRegenList(block);
 				}
@@ -262,35 +293,30 @@ public class Regenerator implements Runnable {
 	}
 
 	private void addBlockToRegenList(Block block) {
-		if(!block.hasMetadata(KEY_ORIGINAL_TYPE_ID)){
-			block.setMetadata(KEY_ORIGINAL_TYPE_ID, new FixedMetadataValue(plugin, block.getTypeId()));
-		}
 		plugin.getLogger().info("addBlockToRegenList - " + block.getLocation().toString());
 		regenBlockList.add(block);	
 	}
 	
 	private void regenBlock(Block block)
 	{
-		//plugin.getLogger().info("regenBlock: " + block.getLocation().toString());
-		int block_type = getOriginalBlockTypeId(block);
-		if(block_type != -1){
-			//plugin.getLogger().info("     regenerating block at " + block.getLocation().toString() + " from:" + block.getTypeId() + " to:" + block_type);
-			block.setTypeId(block_type);				
-			block.removeMetadata(KEY_ORIGINAL_TYPE_ID, plugin);
-		}
+		//plugin.getLogger().info("regenBlock: " + block.getLocation().toString() + " id:" + block.getTypeId());
+		Block archetype_block = getArchetypeBlock(block);
+		//plugin.getLogger().info("archetype_block: " + archetype_block.getLocation().toString() + " id:" + archetype_block.getTypeId());
+		block.setTypeId(archetype_block.getTypeId());
 	}	
 	
-	private int getOriginalBlockTypeId(Block block)
-	{
-		assert(block.hasMetadata(KEY_ORIGINAL_TYPE_ID));
-		
-		List<MetadataValue> values = block.getMetadata(KEY_ORIGINAL_TYPE_ID);
-		for(MetadataValue value : values){
-			if(value.getOwningPlugin().getDescription().getName().equals(plugin.getDescription().getName())){ //do we need to do this check? seems inefficient
-				return value.asInt();
-			}
-		}
-		return -1;
+	private Block getArchetypeBlock(Block block)
+	{	
+//		assert(block.hasMetadata(KEY_ORIGINAL_TYPE_ID));
+//		
+//		List<MetadataValue> values = block.getMetadata(KEY_ORIGINAL_TYPE_ID);
+//		for(MetadataValue value : values){
+//			if(value.getOwningPlugin().getDescription().getName().equals(plugin.getDescription().getName())){ //do we need to do this check? seems inefficient
+//				return value.asInt();
+//			}
+//		}
+//		return -1;
+		return archetype_world.getBlockAt(block.getLocation());	
 	}
 	
 	public void onBlockPlacedByPlayer(Block block)
@@ -314,5 +340,96 @@ public class Regenerator implements Runnable {
 		plugin.getLogger().info("clearBlockPlacedByPlayerMetadata - " + block.getLocation().toString());
 		
 		playerPlacedBlockList.remove(block);
+	}
+	
+	@EventHandler(priority = EventPriority.LOW)
+	public void onBlockChange(BlockPlaceEvent event){
+        if (event.isCancelled()) return;
+        if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+        
+		Player player = event.getPlayer();
+		Block block = event.getBlockPlaced();
+		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " placed a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
+		
+		onBlockPlacedByPlayer(block);
+	}
+	
+	@EventHandler(priority = EventPriority.LOW)
+	public void onBlockChange(BlockBreakEvent event){
+        if (event.isCancelled()) return;
+        if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+        
+		Block block = event.getBlock();
+		getLogger().info(event.getEventName() + ": "
+		+ event.getPlayer().getDisplayName()
+		+ " broke a block id: "
+		+ block.getTypeId()
+		+ " at x:" + block.getX()
+		+ " y:" + block.getY()
+		+ " z:" + block.getZ()
+		+ " with:" + event.getPlayer().getItemInHand().toString());
+		
+		onBlockRemoved(block);
+		
+		block.breakNaturally(event.getPlayer().getItemInHand());
+	}
+
+	@EventHandler(priority = EventPriority.LOW)
+	public void onBlockChange(EntityExplodeEvent event){
+        if (event.isCancelled()) return;
+        if (event.getEntity().getWorld().getName().compareTo(worldName) != 0) return;
+
+		List<Block> block_list = event.blockList();
+		if(block_list.size() > 0)
+		{
+			getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
+			onBlockRemoved(block_list);
+		}
+
+		event.setYield(0); //TODO: remove this!
+	}
+	
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(BlockDamageEvent event){
+//        if (event.isCancelled()) return;
+//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//        
+//		getLogger().info(event.getEventName());
+//	}
+//		
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(BlockFadeEvent event){
+//        if (event.isCancelled()) return;
+//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//        
+//		getLogger().info(event.getEventName());
+//		event.getNewState().
+//	}
+//		
+//	@EventHandler(priority = EventPriority.LOW)
+//	public void onBlockChange(EntityChangeBlockEvent event){
+//        if (event.isCancelled()) return;
+//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//        
+//		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
+//	}
+//
+	private Logger getLogger() {
+		return plugin.getLogger();
+	}
+
+	public void regenAll() {
+		plugin.getLogger().info("Regenerator.regenAll()");
+
+		/*if(!regenBlockList.isEmpty()){
+			ListIterator<Block> iter = regenBlockList.listIterator();
+			while (iter.hasNext()) {
+				Block block = (Block) iter.next();
+				if(!isBlockPlacedByPlayer(block)){
+					regenBlockList.remove(block);
+					regenBlock(block);	
+				}
+			}	
+		}*/
 	}
 }

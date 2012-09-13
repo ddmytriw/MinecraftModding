@@ -14,7 +14,7 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class RegenPlugin extends JavaPlugin implements Listener {
+public class RegenPlugin extends JavaPlugin{
 	public long DEFAULT_TASK_PERIOD = 20L;//in ticks
 
 	private int regenTaskId = -1;
@@ -28,10 +28,10 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 		
 		// This will throw a NullPointException if you don't have the command defined in your plugin.yml file!
 		getCommand("regen").setExecutor(new PluginCommandExecutor(this));
+
+		//this.getServer().getPluginManager().registerEvents(this, this);
 		
-		this.getServer().getPluginManager().registerEvents(this, this);
-		
-		regenerator = new Regenerator(this);
+		regenerator = new Regenerator(this, "world");
 		regenerator.onEnable();
 		
 		StartRegen(DEFAULT_TASK_PERIOD);
@@ -42,7 +42,7 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 		super.onDisable();
 		getLogger().info(this.getName() + "onDisable has been invoked!");
 		
-		HandlerList.unregisterAll((Listener)this);
+		//HandlerList.unregisterAll((Listener)this);
 		
 		regenerator.onDisable();
 		regenerator = null;
@@ -78,71 +78,16 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 	}
 	
 	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(BlockPlaceEvent event){
-        if (event.isCancelled()) return;
-        
-		Player player = event.getPlayer();
-		Block block = event.getBlockPlaced();
-		getLogger().info(event.getEventName() + ": " + player.getDisplayName() + " placed a block id: " + block.getTypeId() + " at x:" + block.getX() + " y:" + block.getY() + " z:" + block.getZ());
+	public void onExplosionPrimeEvent(ExplosionPrimeEvent event){
 		
-		regenerator.onBlockPlacedByPlayer(block);
+		getLogger().info(event.getEventName());
+		event.setRadius(5 * event.getRadius());
+	}
+
+	public void RegenAll() {
+		regenerator.regenAll();		
 	}
 	
-	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(BlockBreakEvent event){
-        if (event.isCancelled()) return;
-        
-		Block block = event.getBlock();
-		getLogger().info(event.getEventName() + ": "
-		+ event.getPlayer().getDisplayName()
-		+ " broke a block id: "
-		+ block.getTypeId()
-		+ " at x:" + block.getX()
-		+ " y:" + block.getY()
-		+ " z:" + block.getZ()
-		+ " with:" + event.getPlayer().getItemInHand().toString());
-		
-		regenerator.onBlockRemoved(block);
-		
-		block.breakNaturally(event.getPlayer().getItemInHand());
-	}
-
-	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockChange(EntityExplodeEvent event){
-        if (event.isCancelled()) return;
-
-		List<Block> block_list = event.blockList();
-		if(block_list.size() > 0)
-		{
-			getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
-			regenerator.onBlockRemoved(block_list);
-		}
-
-		event.setYield(0); //TODO: remove this!
-	}
-	
-//	@EventHandler(priority = EventPriority.LOW)
-//	public void onBlockChange(BlockDamageEvent event){
-//        if (event.isCancelled()) return;
-//        
-//		getLogger().info(event.getEventName());
-//	}
-//		
-//	@EventHandler(priority = EventPriority.LOW)
-//	public void onBlockChange(BlockFadeEvent event){
-//        if (event.isCancelled()) return;
-//        
-//		getLogger().info(event.getEventName());
-//		event.getNewState().
-//	}
-//		
-//	@EventHandler(priority = EventPriority.LOW)
-//	public void onBlockChange(EntityChangeBlockEvent event){
-//        if (event.isCancelled()) return;
-//        
-//		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
-//	}
-//	
 //	@EventHandler(priority = EventPriority.LOW)
 //	public void onChunkLoaded(ChunkLoadEvent event){
 //		if(event.isNewChunk()){
@@ -154,10 +99,4 @@ public class RegenPlugin extends JavaPlugin implements Listener {
 //	public void onChunkLoaded(ChunkPopulateEvent event){
 //		getLogger().info(event.getEventName() + ": loc:" + event.getChunk().getX() + "," + event.getChunk().getZ());
 //	}
-	
-	@EventHandler(priority = EventPriority.LOW)
-	public void onChunkLoaded(ExplosionPrimeEvent event){
-		getLogger().info(event.getEventName());
-		event.setRadius(25 * event.getRadius());
-	}
 }

@@ -38,6 +38,10 @@ public class PluginCommandExecutor implements CommandExecutor {
 				{
 					plugin.StopRegen();
 				}
+				else if(arg3[0].equalsIgnoreCase("regenall"))
+				{
+					plugin.RegenAll();
+				}
 			}
 			return true;
 		}
