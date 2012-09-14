@@ -1,25 +1,27 @@
 package com.gmail.ddmytriw.RegenPlugin;
 
-import java.util.List;
-
-import org.bukkit.block.Block;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class RegenPlugin extends JavaPlugin{
-	public long DEFAULT_TASK_PERIOD = 20L;//in ticks
-
-	private int regenTaskId = -1;
+	static public RegenPlugin plugin;
 	
+	//Singleton
+	static public RegenPlugin get(){
+		assert (plugin != null);
+		return plugin;
+	}
+	
+	public long DEFAULT_TASK_PERIOD = 20L;//in ticks
+	private int regenTaskId = -1;	
 	private Regenerator regenerator;
+
+	public RegenPlugin() {
+		super();
+		plugin = this;
+	}
 
 	@Override
 	public void onEnable() {
@@ -31,7 +33,7 @@ public class RegenPlugin extends JavaPlugin{
 
 		//this.getServer().getPluginManager().registerEvents(this, this);
 		
-		regenerator = new Regenerator(this, "world");
+		regenerator = new Regenerator("world");
 		regenerator.onEnable();
 		
 		StartRegen(DEFAULT_TASK_PERIOD);

@@ -8,7 +8,6 @@ import java.util.ListIterator;
 import java.util.logging.Logger;
 
 import org.bukkit.World;
-import org.bukkit.WorldCreator;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -18,10 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.ExplosionPrimeEvent;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.metadata.MetadataValue;
-import org.bukkit.plugin.Plugin;
 
 import java.io.*;
 
@@ -33,22 +28,18 @@ import javax.xml.transform.*;
 import javax.xml.transform.dom.*;
 import javax.xml.transform.stream.*;
 
-public class Regenerator implements Runnable, Listener {
-	private Plugin plugin;
-	
+public class Regenerator implements Runnable, Listener {	
 	private List<Block> regenBlockList = new ArrayList<Block>();
-	private List<Block> playerPlacedBlockList = new ArrayList<Block>();
 	
 	private String worldName;
-	static String WORLD_NAME_ARCHETYPE_WORLD = "archetype_world";
-	private World archetype_world;
+	private ArchetypeWorld archetype_world;
+	private PlayerPlacedWorld pp_world;
 
 	static String BLOCK_LIST_FILE_FOLDER = System.getProperty("user.dir") + "\\plugins\\";
 	static String BLOCK_LIST_FILE = BLOCK_LIST_FILE_FOLDER + "blockLists.xml";
 	
-	public Regenerator(Plugin plugin, String world_name) {
+	public Regenerator(String world_name) {
 		super();
-		this.plugin = plugin;
 		worldName = world_name;
 	}
 
@@ -59,35 +50,24 @@ public class Regenerator implements Runnable, Listener {
 
 	public void onEnable()
 	{
-		plugin.getLogger().info("Regenerator.onEnable()");
+		RegenPlugin.get().getLogger().info("Regenerator.onEnable()");
 		
-		plugin.getServer().getPluginManager().registerEvents((Listener) this, plugin);
-
-		World world = plugin.getServer().getWorld(worldName);
-		assert(world != null);		
-		archetype_world = plugin.getServer().getWorld(WORLD_NAME_ARCHETYPE_WORLD);
-		if(null == archetype_world)
-		{
-			plugin.getLogger().info("creating new World: 'archetype_world'.");
-			WorldCreator wc = new WorldCreator(WORLD_NAME_ARCHETYPE_WORLD);
-			wc.copy(world);
-			archetype_world = wc.createWorld();
-		}
+		RegenPlugin.get().getServer().getPluginManager().registerEvents((Listener) this, RegenPlugin.get());
 		
-		archetype_world.setSpawnFlags(false, false);
-		archetype_world.setAutoSave(false);
-		archetype_world.setKeepSpawnInMemory(false);
-		plugin.getLogger().info("archetype_world ready!");
+		archetype_world = new ArchetypeWorld(worldName);
+		pp_world = new PlayerPlacedWorld(worldName);
 		
 		loadBlockList();
 	}
 
 	public void onDisable() 
 	{
-		plugin.getLogger().info("Regenerator.onDisable()");
-		saveBlockList();
+		RegenPlugin.get().getLogger().info("Regenerator.onDisable()");
 		
 		HandlerList.unregisterAll((Listener)this);
+		
+		saveBlockList();
+		
 	}
 
 	public void regenTask()
@@ -102,7 +82,7 @@ public class Regenerator implements Runnable, Listener {
 			ListIterator<Block> iter = regenBlockList.listIterator();
 			while (iter.hasNext()) {
 				Block block = (Block) iter.next();
-				if(!isBlockPlacedByPlayer(block)){
+				if(!pp_world.isBlockPlacedByPlayer(block)){
 					regenBlockList.remove(block);
 					regenBlock(block);
 					break;					
@@ -113,7 +93,7 @@ public class Regenerator implements Runnable, Listener {
 	
 	public void saveBlockList()
 	{
-		plugin.getLogger().info(plugin.getName() + ".SaveBlockList()");
+		RegenPlugin.get().getLogger().info(RegenPlugin.get().getName() + ".SaveBlockList()");
 		
 		//TODO: Save block list into SQL DB
 		
@@ -207,7 +187,7 @@ public class Regenerator implements Runnable, Listener {
 	
 	public void loadBlockList()
 	{
-		plugin.getLogger().info(plugin.getName() + ".LoadBlockList() fileName: " + BLOCK_LIST_FILE);
+		RegenPlugin.get().getLogger().info(RegenPlugin.get().getName() + ".LoadBlockList() fileName: " + BLOCK_LIST_FILE);
 		
         DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
         DocumentBuilder docBuilder;
@@ -244,7 +224,7 @@ public class Regenerator implements Runnable, Listener {
 				{
 					//a child element to process
 					Element block_element = (Element) node;
-					World world = plugin.getServer().getWorld(worldName);
+					World world = RegenPlugin.get().getServer().getWorld(worldName);
 					Block block = world.getBlockAt(Integer.parseInt(block_element.getAttribute("x"))
 													,Integer.parseInt(block_element.getAttribute("y"))
 													,Integer.parseInt(block_element.getAttribute("z")));
@@ -272,14 +252,13 @@ public class Regenerator implements Runnable, Listener {
 	}
 
 	public void onBlockRemoved(Block block){
-		plugin.getLogger().info("onBlockRemoved: " + block.getLocation().toString());
+		RegenPlugin.get().getLogger().info("onBlockRemoved: " + block.getLocation().toString());
 		//check that block is original(from the original world generation and not placed by a player or entity)
-		if(isBlockPlacedByPlayer(block)){
-			clearBlockPlacedByPlayerMetadata(block);
+		if(pp_world.isBlockPlacedByPlayer(block)){
+			pp_world.onBlockRemoved(block);
 		}
 		else
-		{
-			//TODO: check that block is 'regeneratable' (ie. not plant life)		
+		{	
 			addBlockToRegenList(block);
 		}
 	}
@@ -293,55 +272,28 @@ public class Regenerator implements Runnable, Listener {
 	}
 
 	private void addBlockToRegenList(Block block) {
-		plugin.getLogger().info("addBlockToRegenList - " + block.getLocation().toString());
+		RegenPlugin.get().getLogger().info("addBlockToRegenList - " + block.getLocation().toString());
 		regenBlockList.add(block);	
 	}
 	
 	private void regenBlock(Block block)
 	{
 		//plugin.getLogger().info("regenBlock: " + block.getLocation().toString() + " id:" + block.getTypeId());
-		Block archetype_block = getArchetypeBlock(block);
+		Block archetype_block = archetype_world.getBlockAt(block.getLocation());
 		//plugin.getLogger().info("archetype_block: " + archetype_block.getLocation().toString() + " id:" + archetype_block.getTypeId());
 		block.setTypeId(archetype_block.getTypeId());
 	}	
 	
-	private Block getArchetypeBlock(Block block)
-	{	
-//		assert(block.hasMetadata(KEY_ORIGINAL_TYPE_ID));
-//		
-//		List<MetadataValue> values = block.getMetadata(KEY_ORIGINAL_TYPE_ID);
-//		for(MetadataValue value : values){
-//			if(value.getOwningPlugin().getDescription().getName().equals(plugin.getDescription().getName())){ //do we need to do this check? seems inefficient
-//				return value.asInt();
-//			}
-//		}
-//		return -1;
-		return archetype_world.getBlockAt(block.getLocation());	
-	}
 	
 	public void onBlockPlacedByPlayer(Block block)
 	{
-		plugin.getLogger().info("onBlockPlacedByPlayer - " + block.getLocation().toString());
+		RegenPlugin.get().getLogger().info("onBlockPlacedByPlayer - " + block.getLocation().toString());
 
-		//add to list so we can save it
-		if(!playerPlacedBlockList.contains(block))
-		{
-			playerPlacedBlockList.add(block);
+		if(block.getTypeId() != archetype_world.getBlockAt(block.getLocation()).getTypeId()){
+			pp_world.onBlockPlacedByPlayer(block);
 		}
 	}
-	
-	private boolean isBlockPlacedByPlayer(Block block)
-	{
-		return playerPlacedBlockList.contains(block);
-	}
-	
-	private void clearBlockPlacedByPlayerMetadata(Block block)
-	{
-		plugin.getLogger().info("clearBlockPlacedByPlayerMetadata - " + block.getLocation().toString());
-		
-		playerPlacedBlockList.remove(block);
-	}
-	
+
 	@EventHandler(priority = EventPriority.LOW)
 	public void onBlockChange(BlockPlaceEvent event){
         if (event.isCancelled()) return;
@@ -415,21 +367,20 @@ public class Regenerator implements Runnable, Listener {
 //	}
 //
 	private Logger getLogger() {
-		return plugin.getLogger();
+		return RegenPlugin.get().getLogger();
 	}
 
 	public void regenAll() {
-		plugin.getLogger().info("Regenerator.regenAll()");
+		RegenPlugin.get().getLogger().info("Regenerator.regenAll()");
 
-		/*if(!regenBlockList.isEmpty()){
+		if(!regenBlockList.isEmpty()){
 			ListIterator<Block> iter = regenBlockList.listIterator();
+			
 			while (iter.hasNext()) {
 				Block block = (Block) iter.next();
-				if(!isBlockPlacedByPlayer(block)){
-					regenBlockList.remove(block);
-					regenBlock(block);	
-				}
-			}	
-		}*/
+				regenBlock(block);	
+			}
+			regenBlockList.clear();
+		}
 	}
 }
