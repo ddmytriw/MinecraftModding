@@ -31,16 +31,15 @@ import javax.xml.transform.stream.*;
 public class Regenerator implements Runnable, Listener {	
 	private List<Block> regenBlockList = new ArrayList<Block>();
 	
-	private String worldName;
-	private ArchetypeWorld archetype_world;
-	private PlayerPlacedWorld pp_world;
+	private World originalWorld;
+	private ArchetypeBlockManager archetype_world;
+	private PlayerPlacedBlockManager pp_world;
 
-	static String BLOCK_LIST_FILE_FOLDER = System.getProperty("user.dir") + "\\plugins\\";
-	static String BLOCK_LIST_FILE = BLOCK_LIST_FILE_FOLDER + "blockLists.xml";
+	static String BLOCK_LIST_FILE = "blockLists.xml";
 	
-	public Regenerator(String world_name) {
+	public Regenerator(World world) {
 		super();
-		worldName = world_name;
+		originalWorld = world;
 	}
 
 	@Override
@@ -54,8 +53,10 @@ public class Regenerator implements Runnable, Listener {
 		
 		RegenPlugin.get().getServer().getPluginManager().registerEvents((Listener) this, RegenPlugin.get());
 		
-		archetype_world = new ArchetypeWorld(worldName);
-		pp_world = new PlayerPlacedWorld(worldName);
+		archetype_world = new ArchetypeBlockManager(originalWorld);
+		archetype_world.onEnable();
+		pp_world = new PlayerPlacedBlockManager(originalWorld);
+		pp_world.onEnable();
 		
 		loadBlockList();
 	}
@@ -65,6 +66,9 @@ public class Regenerator implements Runnable, Listener {
 		RegenPlugin.get().getLogger().info("Regenerator.onDisable()");
 		
 		HandlerList.unregisterAll((Listener)this);
+
+		archetype_world.onDisable();
+		pp_world.onDisable();
 		
 		saveBlockList();
 		
@@ -157,7 +161,12 @@ public class Regenerator implements Runnable, Listener {
         System.out.println("Here's the xml:\n\n" + xmlString);
         
         //write to .xml file		
-		File file = new File(BLOCK_LIST_FILE);
+		File folder = RegenPlugin.get().getDataFolder();
+		if(!folder.isDirectory()){
+			folder.mkdir();	
+		}
+		
+		File file = new File(folder.getAbsolutePath() + "\\" + BLOCK_LIST_FILE);
 		if(!file.exists()){
 			try {
 				file.createNewFile();
@@ -169,7 +178,7 @@ public class Regenerator implements Runnable, Listener {
 		
 		FileOutputStream fos;
 		try {
-			fos = new FileOutputStream(BLOCK_LIST_FILE);
+			fos = new FileOutputStream(file);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			return;
@@ -224,8 +233,7 @@ public class Regenerator implements Runnable, Listener {
 				{
 					//a child element to process
 					Element block_element = (Element) node;
-					World world = RegenPlugin.get().getServer().getWorld(worldName);
-					Block block = world.getBlockAt(Integer.parseInt(block_element.getAttribute("x"))
+					Block block = originalWorld.getBlockAt(Integer.parseInt(block_element.getAttribute("x"))
 													,Integer.parseInt(block_element.getAttribute("y"))
 													,Integer.parseInt(block_element.getAttribute("z")));
 					
@@ -282,6 +290,7 @@ public class Regenerator implements Runnable, Listener {
 		Block archetype_block = archetype_world.getBlockAt(block.getLocation());
 		//plugin.getLogger().info("archetype_block: " + archetype_block.getLocation().toString() + " id:" + archetype_block.getTypeId());
 		block.setTypeId(archetype_block.getTypeId());
+		block.setData(archetype_block.getData());
 	}	
 	
 	
@@ -289,6 +298,7 @@ public class Regenerator implements Runnable, Listener {
 	{
 		RegenPlugin.get().getLogger().info("onBlockPlacedByPlayer - " + block.getLocation().toString());
 
+		//if block doesn't match original id then it is considered 'placed by player'
 		if(block.getTypeId() != archetype_world.getBlockAt(block.getLocation()).getTypeId()){
 			pp_world.onBlockPlacedByPlayer(block);
 		}
@@ -297,7 +307,7 @@ public class Regenerator implements Runnable, Listener {
 	@EventHandler(priority = EventPriority.LOW)
 	public void onBlockChange(BlockPlaceEvent event){
         if (event.isCancelled()) return;
-        if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+        if (event.getBlock().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
         
 		Player player = event.getPlayer();
 		Block block = event.getBlockPlaced();
@@ -309,7 +319,7 @@ public class Regenerator implements Runnable, Listener {
 	@EventHandler(priority = EventPriority.LOW)
 	public void onBlockChange(BlockBreakEvent event){
         if (event.isCancelled()) return;
-        if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+        if (event.getBlock().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
         
 		Block block = event.getBlock();
 		getLogger().info(event.getEventName() + ": "
@@ -329,7 +339,7 @@ public class Regenerator implements Runnable, Listener {
 	@EventHandler(priority = EventPriority.LOW)
 	public void onBlockChange(EntityExplodeEvent event){
         if (event.isCancelled()) return;
-        if (event.getEntity().getWorld().getName().compareTo(worldName) != 0) return;
+        if (event.getEntity().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
 
 		List<Block> block_list = event.blockList();
 		if(block_list.size() > 0)
@@ -344,7 +354,7 @@ public class Regenerator implements Runnable, Listener {
 //	@EventHandler(priority = EventPriority.LOW)
 //	public void onBlockChange(BlockDamageEvent event){
 //        if (event.isCancelled()) return;
-//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//    if (event.getBlock().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
 //        
 //		getLogger().info(event.getEventName());
 //	}
@@ -352,7 +362,7 @@ public class Regenerator implements Runnable, Listener {
 //	@EventHandler(priority = EventPriority.LOW)
 //	public void onBlockChange(BlockFadeEvent event){
 //        if (event.isCancelled()) return;
-//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//    if (event.getBlock().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
 //        
 //		getLogger().info(event.getEventName());
 //		event.getNewState().
@@ -361,7 +371,7 @@ public class Regenerator implements Runnable, Listener {
 //	@EventHandler(priority = EventPriority.LOW)
 //	public void onBlockChange(EntityChangeBlockEvent event){
 //        if (event.isCancelled()) return;
-//    if (event.getBlock().getWorld().getName().compareTo(worldName) != 0) return;
+//    if (event.getBlock().getWorld().getName().compareTo(originalWorld.getName()) != 0) return;
 //        
 //		getLogger().info(event.getEventName() + ": " + event.getEntityType().getName());
 //	}

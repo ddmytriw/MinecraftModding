@@ -1,8 +1,12 @@
 package com.gmail.ddmytriw.RegenPlugin;
 
+import java.util.List;
+
+import org.bukkit.World;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
+import org.bukkit.generator.BlockPopulator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class RegenPlugin extends JavaPlugin{
@@ -33,9 +37,16 @@ public class RegenPlugin extends JavaPlugin{
 
 		//this.getServer().getPluginManager().registerEvents(this, this);
 		
-		regenerator = new Regenerator("world");
+		World world = getServer().getWorld("world");
+		regenerator = new Regenerator(world);
 		regenerator.onEnable();
-		
+
+		this.getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable(){
+			@Override
+			public void run() {
+				getServer().getWorld("world").setFullTime(6000);
+			}			
+		}, 0L, 20L*60L);
 		StartRegen(DEFAULT_TASK_PERIOD);
 	}
 	
@@ -88,6 +99,15 @@ public class RegenPlugin extends JavaPlugin{
 
 	public void RegenAll() {
 		regenerator.regenAll();		
+	}
+
+	public void TestFunc() {
+		getLogger().info(this.getName() + ".TestFunc()");
+		World world = getServer().getWorld("world");
+		List<BlockPopulator> list = world.getPopulators();
+		for (BlockPopulator blockPopulator : list) {
+			getLogger().info(" BlockPopulator: " + blockPopulator.toString());			
+		}
 	}
 	
 //	@EventHandler(priority = EventPriority.LOW)
